@@ -2,9 +2,10 @@ local l3d = require("love3d")
 l3d.import(true)
 
 local cpml = require "cpml"
+local iqm = require "iqm"
 
 local camx = 0
-local camy = 0.1
+local camy = 1
 local camz = 0
 
 local camlookx = 0
@@ -18,6 +19,7 @@ local chunks = {}
 local chunkmeshes = {}
 
 local pointlights = {{{-2,1,8},0.2,0.09, 0.032,{0.05,0.05,0.05},{0.8,0.8,0.8},3.0},{{2,1,8},0.2,0.09, 0.032,{0.05,0.05,0.05},{0.8,0.8,0.8},3.0}}
+local lightDir = {0,1,1}
 
 local show_debug = true
 
@@ -25,14 +27,17 @@ local debug_text = "Program started...\n"
 
 local shader = 0
 
-local vox_verts =  {{-1,-1,-1},
-					{ 1,-1,-1},
-					{ 1,-1, 1},
-					{-1,-1, 1},
-					{-1, 1,-1},
-					{ 1, 1,-1},
-					{ 1, 1, 1},
-					{-1, 1, 1}}
+local m = iqm.load("models/block.iqm",true).triangles
+
+for _, triangle in ipairs(m.triangles) do
+	for i=1,#triangle do
+		if not cpml.vec3.is_vec3(triangle[i].position) then
+			triangle[i].position = cpml.vec3(triangle[i].position)
+		end
+	end
+end
+
+local vox_verts = m.triangles
 
 function getVerts(x,y,z)
 	local verts = {}
@@ -41,21 +46,25 @@ function getVerts(x,y,z)
 		table.insert(verts,cpml.vec3(vert[1]+x,vert[2]+y,vert[3]+z))
 	end
 	
+	if verts == {} then
+		print("error halp")
+	end
+	
 	return verts
 end
 
 function generateChunks()
 	local c = {}
 	
-	for cx=1,16 do
+	for cx=1,4 do
 		table.insert(c,{})
-		for cy=1,16 do
+		for cy=1,4 do
 			local chunk = {}
-			for x=1,16 do
+			for x=1,4 do
 				table.insert(chunk,{})
-				for y=1,16 do
+				for y=1,4 do
 					table.insert(chunk[x],{})
-					for z=1,16 do
+					for z=1,4 do
 						table.insert(chunk[x][y],1)
 					end
 				end
@@ -73,23 +82,38 @@ function generateChunkMeshes(c)
 	for cx=1,#c do
 		for cy=1,#c[cx] do
 			local chunk = c[cx][cy]
+			local mesh = {}
 			for x=1,#chunk do
 				for y=1,#chunk[x] do
 					for z=1,#chunk[x][y] do
-						if chunk[x][y][z] > 0 then
-							table.insert(meshdata,{getVerts(x,y,z),cx,cy})
+						if x ~= nil and y ~= nil and z ~= nil then
+							if chunk[x][y][z] > 0 then
+								table.insert(mesh,{getVerts(x,y,z),cx,cy})
+							end
 						end
 					end
 				end
 			end
+			if mesh ~= nil then
+				table.insert(meshdata,mesh)
+			else
+				print("["..tostring(cx).."; "..tostring(cy).."]")
+			end
 		end
 	end
 	
+	print(meshdata[1])
+	print(meshdata[1][1])
+	
+	local cmeshdata = {}
+	
 	for _,data in ipairs(meshdata) do
-		meshdata[_][1] = l3d.new_triangles(data[1])
+		for _,m in ipairs(data) do
+			table.insert(cmeshdata,{l3d.new_triangles(m[1]),m[2],m[3]})
+		end
 	end
 	
-	return meshdata
+	return cmeshdata
 end
 
 function love.load()
@@ -195,7 +219,9 @@ function love.draw()
 		
 		shader:send("u_model",model:to_vec4s())
 		
-		love.graphics.draw(d[1].mesh)
+		-- love.graphics.setColor(0,0,0)
+		
+		love.graphics.draw(d[1])
 	end
 	
 	love.graphics.setShader()
