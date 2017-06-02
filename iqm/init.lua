@@ -1,6 +1,7 @@
 local base = (...):gsub('%.init$', '') .. "."
 local c    = require(base .. "iqm-ffi")
 local ffi  = require "ffi"
+local love = require "love"
 
 local iqm = {
 	_LICENSE     = "Inter-Quake Model Loader is distributed under the terms of the MIT license. See LICENSE.md.",
@@ -20,7 +21,7 @@ local function load_data(file)
 
 	-- Make sure it's a valid IQM file
 	if not is_buffer then
-		assert(love.filesystem.isFile(file))
+		assert(love.filesystem.isFile(file), ("File %s not found"):format(file))
 		assert(check_magic(love.filesystem.read(file, 16)))
 	end
 
@@ -83,7 +84,7 @@ local function dump_strings(text)
 end
 
 -- 'file' can be either a filename or IQM data (as long as the magic is intact)
-function iqm.load(file)
+function iqm.load(file, save_data, preserve_cw)
 	-- HACK: Workaround for a bug in LuaJIT's GC - we need to turn it off for the
 	-- rest of the function or we'll get a segfault shortly into these loops.
 	--
@@ -189,10 +190,6 @@ function iqm.load(file)
 			for j = 0, va.size-1 do
 				vertices[i][va.type][j] = ptr[i*va.size+j]
 			end
-			-- if va.type == "weight" then
-			-- 	local v = vertices[i][va.type]
-			-- 	print(v[0], v[1], v[2], v[3])
-			-- end
 			if va.type == "position" then
 				local v = vertices[i][va.type]
 				for i = 1, 3 do
@@ -215,10 +212,39 @@ function iqm.load(file)
 	-- Translate indices for love
 	local indices = {}
 	for _, triangle in ipairs(triangles) do
-		table.insert(indices, triangle.vertex[0] + 1)
-		-- IQM uses CW winding, but we want CCW. Reverse.
-		table.insert(indices, triangle.vertex[2] + 1)
-		table.insert(indices, triangle.vertex[1] + 1)
+		if preserve_cw then
+			table.insert(indices, triangle.vertex[0] + 1)
+			table.insert(indices, triangle.vertex[1] + 1)
+			table.insert(indices, triangle.vertex[2] + 1)
+		else
+			-- IQM uses CW winding, but we want CCW. Reverse.
+			table.insert(indices, triangle.vertex[0] + 1)
+			table.insert(indices, triangle.vertex[2] + 1)
+			table.insert(indices, triangle.vertex[1] + 1)
+		end
+	end
+
+	-- re-read the vertex data :(
+	local save_buffer = {}
+	if save_data then
+		local buffer = {}
+		for _, va in ipairs(found_types) do
+			local ptr = read_ptr(data, va.format, va.offset)
+			for i = 1, header.num_vertexes do
+				buffer[i] = buffer[i] or {}
+				buffer[i][va.type] = {}
+				for j = 0, va.size-1 do
+					buffer[i][va.type][j+1] = ptr[(i-1)*va.size+j]
+				end
+			end
+		end
+		for i, triangle in ipairs(triangles) do
+			save_buffer[i] = {
+				buffer[triangle.vertex[0] + 1],
+				buffer[triangle.vertex[2] + 1],
+				buffer[triangle.vertex[1] + 1]
+			}
+		end
 	end
 
 	local layout = {}
@@ -239,6 +265,7 @@ function iqm.load(file)
 	local objects = {}
 	objects.bounds = {}
 	objects.bounds.base = computed_bbox
+	objects.triangles = save_buffer
 
 	if header.ofs_bounds > 0 then
 		local bounds = read_offset(
