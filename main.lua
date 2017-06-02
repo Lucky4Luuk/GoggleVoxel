@@ -27,23 +27,38 @@ local debug_text = "Program started...\n"
 
 local shader = 0
 
-local m = iqm.load("models/block.iqm",true).triangles
+local m = iqm.load("models/block.iqm",true)
+
+local vox_verts = {}
+
+-- print(type(cpml.vec3(0,0,0)))
 
 for _, triangle in ipairs(m.triangles) do
+	local face = {}
 	for i=1,#triangle do
 		if not cpml.vec3.is_vec3(triangle[i].position) then
-			triangle[i].position = cpml.vec3(triangle[i].position)
+			local pos = triangle[i].position
+			table.insert(face,cpml.vec3(pos))
 		end
 	end
+	
+	face = {face[1],face[3],face[2]}
+	table.insert(vox_verts,face)
 end
 
-local vox_verts = m.triangles
+-- for _, x in ipairs(vox_verts) do
+	-- for _,y in ipairs(vox_verts[x]) do
+		-- print(vox_verts[x][y])
+	-- end
+-- end
 
 function getVerts(x,y,z)
 	local verts = {}
 	
 	for _,vert in ipairs(vox_verts) do
-		table.insert(verts,cpml.vec3(vert[1]+x,vert[2]+y,vert[3]+z))
+		-- print(type(vert[1]))
+		local pos = vert[1] + cpml.vec3(x,y,z)
+		table.insert(verts,pos)
 	end
 	
 	if verts == {} then
@@ -88,7 +103,7 @@ function generateChunkMeshes(c)
 					for z=1,#chunk[x][y] do
 						if x ~= nil and y ~= nil and z ~= nil then
 							if chunk[x][y][z] > 0 then
-								table.insert(mesh,{getVerts(x,y,z),cx,cy})
+								table.insert(mesh,{getVerts(x+cx,y,z+cy),cx,cy})
 							end
 						end
 					end
@@ -102,14 +117,14 @@ function generateChunkMeshes(c)
 		end
 	end
 	
-	print(meshdata[1])
-	print(meshdata[1][1])
+	-- print(meshdata[1])
+	-- print(meshdata[1][1])
 	
 	local cmeshdata = {}
 	
 	for _,data in ipairs(meshdata) do
-		for _,m in ipairs(data) do
-			table.insert(cmeshdata,{l3d.new_triangles(m[1]),m[2],m[3]})
+		for _,mo in ipairs(data) do
+			table.insert(cmeshdata,{l3d.new_triangles(mo[1]),mo[2],mo[3]})
 		end
 	end
 	
@@ -178,6 +193,15 @@ function love.update(dt)
 	end
 end
 
+function draw_debug()
+	love.graphics.print("Current FPS: "..tostring(love.timer.getFPS( )), 10, 10)
+	love.graphics.print("Current MS:  "..tostring(math.floor(love.timer.getDelta( )*1000*100)/100), 10, 30)
+	
+	love.graphics.print("Position:    ["..tostring(camx).."; "..tostring(camy).."; "..tostring(camz).."]",10,50)
+	love.graphics.print("Debuglog:",10,70)
+	love.graphics.print(debug_text,10,90)
+end
+
 function love.draw()
 	l3d.set_depth_test("less")
 	l3d.set_depth_write(true)
@@ -228,6 +252,7 @@ function love.draw()
 	l3d.set_depth_test()
 	l3d.set_depth_write(false)
 	
-	love.graphics.print("Current FPS: "..tostring(love.timer.getFPS( )), 10, 10)
-	love.graphics.print("Current MS:  "..tostring(math.floor(love.timer.getDelta( )*1000*100)/100), 10, 30)
+	if show_debug then
+		draw_debug()
+	end
 end
