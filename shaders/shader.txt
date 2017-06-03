@@ -1,10 +1,11 @@
-varying vec3 f_normal;
+varying vec3 f_pos;
 varying vec3 plAdd;
 varying vec3 light_dir;
 varying vec4 ShadowCoord;
 
 #ifdef VERTEX
 	attribute vec3 VertexNormal;
+	attribute vec3 localPos;
 	
 	struct PointLight {    
 		vec3 position;
@@ -51,7 +52,7 @@ varying vec4 ShadowCoord;
 	}
 
 	vec4 position(mat4 mvp, vec4 v_position) {
-		ShadowCoord = depthBiasMVP * v_position;
+		//ShadowCoord = depthBiasMVP * v_position;
 		plAdd = vec3(0.0);
 		vec3 vNn = normalize(VertexNormal);
 		vec4 vpos = u_model * v_position;
@@ -59,35 +60,31 @@ varying vec4 ShadowCoord;
 			plAdd += CalcPointLight(pointlights[i], vNn, vpos.xyz); //Function to calculate pointlight influence
 		}
 		plAdd = min(max(plAdd,0.0),1.0);
-		f_normal = (u_model * vec4(VertexNormal, 1.0)).xyz;
+		f_pos = localPos;
 		return u_projection * u_view * u_model * v_position;
 	}
 #endif
 
 #ifdef PIXEL
-	uniform Image shadowMap;
 	
-	vec4 effect(vec4 color, Image texture, vec2 texture_coords, vec2 screen_coords) {
-		float visibility = 1.0;
-		if ( ( Texel( shadowMap, ShadowCoord.xy ).r * 10000)  <  ShadowCoord.z){
-			visibility = 0.5;
-			return vec4(1,0,0,1);
-		}
+	vec4 effect(vec4 color, Image texture, vec2 texture_coords, vec2 screen_coords) {		
 		vec4 ambient = vec4(0.1,0.1,0.1,0.0);
 		
-		vec3 normal = normalize(f_normal);
 		vec3 light = normalize(light_dir);
-
-		vec4 texcol = texture2D(texture, texture_coords);
-		vec4 out_color = vec4(0.0,0.0,0.0,1.0);
-		out_color *= texcol;
-		out_color *= max(dot(normal, light),1.0);
-		out_color += vec4(plAdd,1.0);
+		
+		float l_in = dot(normalize(f_pos),light);
+		
+		vec4 out_color = vec4(l_in,l_in,l_in,1);
+		
 		out_color += ambient;
+		out_color += vec4(plAdd,1.0);
 		out_color *= color;
-		out_color *= visibility;
 		out_color.a = 1.0;
 
-		return out_color;
+		//return out_color;
+		
+		return vec4(vec3(l_in),1);
+		
+		//return vec4(normalize(f_pos),1);
 	}
 #endif

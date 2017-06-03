@@ -287,9 +287,14 @@ function l3d.new_triangles(t, offset, mesh, usage)
 	local data, indices = {}, {}
 	for k, v in ipairs(t) do
 		local current = {}
-		table.insert(current, v.x + offset.x)
-		table.insert(current, v.y + offset.y)
-		table.insert(current, v.z + offset.z)
+		
+		table.insert(current, v[1] + offset.x)
+		table.insert(current, v[2] + offset.y)
+		table.insert(current, v[3] + offset.z)
+		table.insert(current, v[4])
+		table.insert(current, v[5])
+		table.insert(current, v[6])
+		
 		table.insert(data, current)
 		if not mesh then
 			table.insert(indices, k)
@@ -298,7 +303,8 @@ function l3d.new_triangles(t, offset, mesh, usage)
 
 	if not mesh then
 		local layout = {
-			{ "VertexPosition", "float", 3 }
+			{ "VertexPosition", "float", 3 },
+			{ "localPos", "float", 3 }
 		}
 
 		local m = love.graphics.newMesh(layout, data, "triangles", usage or "static")

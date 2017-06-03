@@ -5,12 +5,14 @@ local cpml = require "cpml"
 local iqm = require "iqm"
 
 local camx = 0
-local camy = 1
+local camy = 6
 local camz = 0
 
 local camlookx = 0
 local camlooky = 0
 local camlookz = 0
+
+local camspeed = 1500
 
 local camrot = cpml.vec3()
 local sensitivity = 15
@@ -19,7 +21,7 @@ local chunks = {}
 local chunkmeshes = {}
 
 local pointlights = {{{-2,1,8},0.2,0.09, 0.032,{0.05,0.05,0.05},{0.8,0.8,0.8},3.0},{{2,1,8},0.2,0.09, 0.032,{0.05,0.05,0.05},{0.8,0.8,0.8},3.0}}
-local lightDir = {0,1,1}
+local lightDir = {0,-1,-1}
 
 local show_debug = true
 
@@ -27,38 +29,76 @@ local debug_text = "Program started...\n"
 
 local shader = 0
 
-local m = iqm.load("models/block.iqm",true)
+local a = { 0, 0,-1}
+local b = { 0, 0, 1}
+local c = { 0,-1, 1}
+local d = { 0, 1, 1}
+local e = { 1, 0, 0}
+local f = {-1, 0, 0}
 
-local vox_verts = {}
-
--- print(type(cpml.vec3(0,0,0)))
-
-for _, triangle in ipairs(m.triangles) do
-	local face = {}
-	for i=1,#triangle do
-		if not cpml.vec3.is_vec3(triangle[i].position) then
-			local pos = triangle[i].position
-			table.insert(face,cpml.vec3(pos))
-		end
-	end
-	
-	face = {face[1],face[3],face[2]}
-	table.insert(vox_verts,face)
-end
-
--- for _, x in ipairs(vox_verts) do
-	-- for _,y in ipairs(vox_verts[x]) do
-		-- print(vox_verts[x][y])
-	-- end
--- end
+local vox_verts =  {--BOTTOM SIDE
+					{-1,-1,-1,a},
+					{-1, 1,-1,a},
+					{ 1, 1,-1,a},
+					
+					{ 1, 1,-1,a},
+					{ 1,-1,-1,a},
+					{-1,-1,-1,a},
+					
+					--TOP SIDE
+					{-1,-1, 1,b},
+					{ 1,-1, 1,b},
+					{ 1, 1, 1,b},
+					
+					{ 1, 1, 1,b},
+					{-1, 1, 1,b},
+					{-1,-1, 1,b},
+					
+					--FRONT SIDE
+					{-1,-1,-1,c},
+					{ 1,-1,-1,c},
+					{ 1,-1, 1,c},
+					
+					{ 1,-1, 1,c},
+					{-1,-1, 1,c},
+					{-1,-1,-1,c},
+					
+					--BACK SIDE
+					{ 1, 1,-1,d},
+					{-1, 1,-1,d},
+					{-1, 1, 1,d},
+					
+					{-1, 1, 1,d},
+					{ 1, 1, 1,d},
+					{ 1, 1,-1,d},
+					
+					--RIGHT SIDE
+					{ 1,-1,-1,e},
+					{ 1, 1,-1,e},
+					{ 1, 1, 1,e},
+					
+					{ 1, 1, 1,e},
+					{ 1,-1, 1,e},
+					{ 1,-1,-1,e},
+					
+					--LEFT SIDE
+					{-1, 1,-1,f},
+					{-1,-1,-1,f},
+					{-1,-1, 1,f},
+					
+					{-1,-1, 1,f},
+					{-1, 1, 1,f},
+					{-1, 1,-1,f}
+					}
 
 function getVerts(x,y,z)
 	local verts = {}
 	
 	for _,vert in ipairs(vox_verts) do
 		-- print(type(vert[1]))
-		local pos = vert[1] + cpml.vec3(x,y,z)
-		table.insert(verts,pos)
+		face = vert[4]
+		local data = {vert[1]+x,vert[2]+y,vert[3]+z,face[1],face[2],face[3]}
+		table.insert(verts,data)
 	end
 	
 	if verts == {} then
@@ -103,7 +143,7 @@ function generateChunkMeshes(c)
 					for z=1,#chunk[x][y] do
 						if x ~= nil and y ~= nil and z ~= nil then
 							if chunk[x][y][z] > 0 then
-								table.insert(mesh,{getVerts(x+cx,y,z+cy),cx,cy})
+								table.insert(mesh,{getVerts(x+cx*4,y+cy*4,z),cx,cy})
 							end
 						end
 					end
@@ -151,23 +191,24 @@ function love.update(dt)
 	camrot.x = camrot.x + math.rad(my * sensitivity * dt)
 	camrot.y = camrot.y + math.rad(mx * sensitivity * dt)
 	love.mouse.setPosition(love.graphics.getWidth()/2,love.graphics.getHeight()/2)
+	local fdt = dt*camspeed
 	if love.keyboard.isDown('j') then
-		camrot.y = camrot.y - dt
+		camrot.y = camrot.y - fdt
 		--l3d.rotate(-0.2,cpml.vec3(0,0,1))
 		-- camroty = camroty - 0.01
 	end
 	if love.keyboard.isDown('l') then
-		camrot.y = camrot.y + dt
+		camrot.y = camrot.y + fdt
 		--l3d.rotate(0.2,cpml.vec3(0,0,1))
 		-- camroty = camroty + 0.01
 	end
 	if love.keyboard.isDown('e') then
-		camy = camy + dt
+		camy = camy + fdt
 		-- camlooky = camlooky+0.01
 		--view:translate(view,cpml.vec3(camx,camy,camz))
 	end
 	if love.keyboard.isDown('q') then
-		camy = camy - dt
+		camy = camy - fdt
 		-- camlooky = camlooky-0.01
 		--view:translate(view,cpml.vec3(camx,camy,camz))
 	end
@@ -231,7 +272,7 @@ function love.draw()
 		shader:send("pointlights["..tostring(n).."].intensity",p[7])
 	end
 	
-	shader:send("maxpointlights",1)
+	shader:send("maxpointlights",0)
 	
 	shader:send("u_light_direction", lightDir)
 	shader:send("u_projection", proj:to_vec4s())
@@ -243,7 +284,7 @@ function love.draw()
 		
 		shader:send("u_model",model:to_vec4s())
 		
-		-- love.graphics.setColor(0,0,0)
+		love.graphics.setColor(0,255,0)
 		
 		love.graphics.draw(d[1])
 	end
@@ -251,6 +292,8 @@ function love.draw()
 	love.graphics.setShader()
 	l3d.set_depth_test()
 	l3d.set_depth_write(false)
+	
+	love.graphics.setColor(0,0,0)
 	
 	if show_debug then
 		draw_debug()
